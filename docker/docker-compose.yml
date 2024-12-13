@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  PGroonga:
+    image: groonga/pgroonga:latest
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: PGroonga
+      POSTGRES_PASSWORD: PGroonga
+      POSTGRES_USER: PGroonga
+
+  php:
+    build:
+      context: ./php
+      dockerfile: Dockerfile
+    volumes:
+      - ../html:/var/www/html
+    ports:
+      - 8000:80
+
