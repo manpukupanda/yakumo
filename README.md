@@ -12,7 +12,7 @@ Yakumoは有価証券報告書全文検索システムです。
 | 変数名           | 値の例               | 説明                             |
 |------------------|----------------------|-------------------------------|
 | `YAKUMO_DBSOURCE`   | `user=...`  | データベースの接続文字列 ※１    |
-| `YAKUMO_EDINET_API_KEY`     | `s3cr3t...`     | EDINET API キー|
+| `YAKUMO_EDINET_API_KEY`     | `s3cr3t...`     | EDINET API キー ※２|
 
 
 ※１：DockerのPostgreSQLをそのまま使う場合のデータベース接続文字列は以下の通り
@@ -20,11 +20,16 @@ Yakumoは有価証券報告書全文検索システムです。
 user=PGroonga password=PGroonga dbname=PGroonga sslmode=disable
 ```
 
+※２：  
+YakumoはEDINET APIを利用してデータを取得しています。EDINET APIを利用するにはEDINET API キーが必要です。  
+[EDINET API仕様書](https://disclosure2dl.edinet-fsa.go.jp/guide/static/disclosure/WZEK0110.html)を参照のうえ、取得してください。
+
 ## インストール方法
-goのソースをコンパイルし、実行モジュールを作成します。  
+githubからcloneして、goのソースをコンパイルして実行モジュールを作成します。  
 windowsの場合はyakumoをyakumo.exeとしてください。
 ```bash
-cd ..
+git clone https://github.com/manpukupanda/yakumo.git
+cd yakumo
 go build -o yakumo
 ```
 
@@ -39,15 +44,14 @@ export YAKUMO_DBSOURCE=<データベースの接続文字列>
 Dockerのコンテナを起動します。  
 コンテナはデータベース（PostgreSQL）とPHPの実行用の２つが起動します。
 ```bash
-git clone https://github.com/manpukupanda/yakumo.git
-cd yakumo/docker
+cd docker
 docker-compose up -d
 ```
 
 プログラムを実行する。  
 初回は１年分のデータを取得して処理するため時間がかかります。
 ```bash
-cd yakumo
+cd ..
 yakumo
 ```
 
