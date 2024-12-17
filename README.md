@@ -11,16 +11,9 @@ Yakumoは有価証券報告書全文検索システムです。
 
 | 変数名           | 値の例               | 説明                             |
 |------------------|----------------------|-------------------------------|
-| `YAKUMO_DBSOURCE`   | `user=...`  | データベースの接続文字列 ※１    |
-| `YAKUMO_EDINET_API_KEY`     | `s3cr3t...`     | EDINET API キー ※２|
+| `YAKUMO_EDINET_API_KEY`     | `s3cr3t...`     | EDINET API キー ※1|
 
-
-※１：DockerのPostgreSQLをそのまま使う場合のデータベース接続文字列は以下の通り
-```
-user=PGroonga password=PGroonga dbname=PGroonga sslmode=disable
-```
-
-※２：  
+※1：  
 YakumoはEDINET APIを利用してデータを取得しています。EDINET APIを利用するにはEDINET API キーが必要です。  
 [EDINET API仕様書](https://disclosure2dl.edinet-fsa.go.jp/guide/static/disclosure/WZEK0110.html)を参照のうえ、取得してください。
 
@@ -38,7 +31,6 @@ go build -o yakumo
 環境変数を設定する。
 ```bash
 export YAKUMO_EDINET_API_KEY=<EDINET API キー>
-export YAKUMO_DBSOURCE=<データベースの接続文字列>
 ```
 
 Dockerのコンテナを起動します。  
@@ -58,5 +50,5 @@ yakumo
 プログラムが終了したら、ブラウザで http://localhost:8000/index.php にアクセスして利用してください。
 
 ## ライセンス
-このプロジェクトは [Apache-2.0 license](LICENCE) に基づいています。
+このプロジェクトは Apache-2.0 license に基づいています。
 

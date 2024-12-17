@@ -12,6 +12,53 @@ import (
 // ドライバー名
 const dbDriver string = "postgres"
 
+// データソース：DockerのPostgreSQLへの接続情報
+// デフォルトのDockerコンテナを使わない場合は修正
+var dbSource string = "user=PGroonga password=PGroonga dbname=PGroonga sslmode=disable"
+
+// テーブルとインデックスを作成する。
+// すでに存在する場合はそのまま。（エラーにもしない）
+func createTableAndIndex() error {
+
+	db, err := sql.Open(dbDriver, dbSource)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS documents (
+			date char(10) NOT NULL,
+			seqNumber int NOT NULL,
+			docID char(8) NOT NULL,
+			submitDateTime char(16) NULL,
+			edinetCode char(6) NULL,
+			secCode char(5) NULL,
+			filerName text NULL,
+			periodStart  char(10) NULL,
+			periodEnd char(10) NULL,
+			docDescription text NULL,
+			PRIMARY KEY (date, seqNumber)
+		);
+
+		CREATE TABLE IF NOT EXISTS document_texts (
+			docID char(8) NOT NULL,
+			seq int NOT NULL,
+			title text NOT NULL,
+			breadcrumb text NOT NULL,
+			content text NOT NULL,
+			PRIMARY KEY (docID, seq)
+		);
+
+		CREATE EXTENSION IF NOT EXISTS pgroonga;
+		CREATE INDEX IF NOT EXISTS pgroonga_content_index ON document_texts USING pgroonga (breadcrumb, content);
+		`)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // データベースに登録済みかをチェックする
 func exists(date string, result Result) (bool, error) {
 	db, err := sql.Open(dbDriver, dbSource)

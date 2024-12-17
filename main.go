@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -17,17 +16,6 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// EDINET APIの利用にはAPIキーを取得する必要があります。
-// EDINET操作ガイド(下のURL) >  EDINET API利用規約 に記載の方法にてAPIキーを取得できます。
-//
-//	https://disclosure2dl.edinet-fsa.go.jp/guide/static/disclosure/WZEK0110.html
-//
-// EDINET API のキー：環境変数 YAKUMO_EDINET_API_KEY より取得
-var apiKey string = os.Getenv("YAKUMO_EDINET_API_KEY")
-
-// データソース：PostgreSQLへの接続情報 環境変数 YAKUMO_DBSOURCE より取得
-var dbSource string = os.Getenv("YAKUMO_DBSOURCE")
-
 // 対象の書類かどうかを判定（内国法人の有報(3号様式）のみ対象）
 func isValidForProcessing(result *Result) bool {
 	return result.DocTypeCode == "120" && result.FormCode == "030000" && result.OrdinanceCode == "010"
@@ -35,7 +23,13 @@ func isValidForProcessing(result *Result) bool {
 
 // メイン処理
 func main() {
-	// 直近１年分処理
+	// テーブルとインデックスを作成する（なければなにもしない）
+	err := createTableAndIndex()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 直近１年分処理（当日から遡って１日ずつ）
 	currentTime := time.Now()
 	for i := 0; i < 365; i++ {
 		exexOneDay(currentTime.AddDate(0, 0, -i).Format("2006-01-02"))
@@ -67,7 +61,7 @@ func exexOneDay(date string) {
 			continue
 		}
 
-		fmt.Printf("%s %s %s %s %s\n", date, v.DocID, v.EdinetCode, v.FilerName, v.DocDescription)
+		log.Printf("%s %s %s %s %s\n", date, v.DocID, v.EdinetCode, v.FilerName, v.DocDescription)
 
 		err = resultToText(v)
 		if err != nil {
@@ -118,6 +112,7 @@ func zipToText(zipfile string) error {
 	if err != nil {
 		return err
 	}
+
 	// 作業後にワークディレクトリを削除
 	defer os.RemoveAll(workDir)
 
@@ -164,7 +159,7 @@ func htmlsToText(dirpath string) error {
 	headings = make([]Heading, 0)
 
 	// 各ファイルを順次処理して目次スライスに設定していく
-	var auditStart bool
+	var inAudit bool
 	for _, v := range *htmls {
 		fp, err := os.Open(v)
 		if err != nil {
@@ -172,21 +167,24 @@ func htmlsToText(dirpath string) error {
 		}
 		defer fp.Close()
 
-		audit := false
-		if !auditStart && strings.Contains(v, "AuditDoc") {
-			audit = true
-			auditStart = true
+		// 監査報告書の最初のhtmlであるか
+		firstHtmlOfAuditDoc := false
+		if !inAudit && strings.Contains(v, "AuditDoc") {
+			firstHtmlOfAuditDoc = true
+			inAudit = true
 		}
 
-		err = htmlToText(fp, audit)
+		err = htmlToText(fp, firstHtmlOfAuditDoc)
 		if err != nil {
 			return err
 		}
 	}
 
-	// 目次ごとの本文から余分なスペースを除外する
+	// 目次ごとのテキストから余分なスペースを除外する
 	for i := range headings {
+		// 空白文字、全角スペース、ノーブレークスペースが１つ以上連続する箇所半角スペース１つに置き換える。
 		t := rep.ReplaceAllString(headings[i].text, " ")
+		// 前後の半角スペースは削除
 		headings[i].text = strings.Trim(t, " ")
 	}
 
@@ -230,33 +228,41 @@ func listHtmlFiles(dirPath string) (*[]string, error) {
 }
 
 // htmlから検索用のテキストを作成する
-func htmlToText(r io.Reader, audit bool) error {
+func htmlToText(r io.Reader, firstHtmlOfAuditDoc bool) error {
 
 	// UTF8のBOM付き対応
 	// https://qiita.com/ssc-ynakamura/items/e05dc9bfacee063f3471
 	fallback := unicode.UTF8.NewDecoder()
 	r2 := transform.NewReader(r, unicode.BOMOverride(fallback))
 
-	node, err := html.Parse(r2)
+	documentNode, err := html.Parse(r2)
 	if err != nil {
 		return err
 	}
 
+	// h1～h6、td、th、br タグのテキストは前後に半角スペースを付けるので、そのタグを識別するために使用する。
+	// 例えば、 <div>あああ<h1>見出し１</h1>いいい</div> のテキストは「あああ 見出し１ いいい」となる。
+	// h1がspanだった場合 <div>あああ<span>見出し１</span>いいい</div> のテキストは「あああ見出し１いいい」となる。（spanタグの前後にスペースがつかない）
 	patternSpacedTags := "(h[1-6]|td|th|br)"
 	reSpacedTags := regexp.MustCompile(patternSpacedTags)
 
+	// テキスト中のスペースを詰めるためのパターン
+	// アルファベット数字いくつかの記号に挟まれたスペースは残すが、それ以外の文字（ひらがなカタカナ漢字等）
+	// に挟まれたスペースは除外するために使用する。
+	// 有価証券報告書では氏名等がスペースで幅調整されているので、そのスペースを消すために使用する。
 	patternSpaceMidKanjiEtc := `([^0-9０-９a-zA-Zａ-ｚＡ-Ｚ\,\.\!\?\(\)\%])([\s　\xA0]+)([^0-9０-９a-zA-Zａ-ｚＡ-Ｚ\,\.\!\?\(\)\%])`
 	reSpaceMidKanjiEtc := regexp.MustCompile(patternSpaceMidKanjiEtc)
 
-	if audit {
+	// 表紙のHTMLかどうか
+	// 最初のHTMLを表紙として扱う。
+	// 表紙のHTMLは目次で区切らない
+	isCoverPage := len(headings) == 0
+
+	if firstHtmlOfAuditDoc {
 		headings = append(headings, Heading{title: "監査報告書"})
-	} else if len(headings) == 0 {
+	} else if isCoverPage {
 		headings = append(headings, Heading{title: "表紙"})
 	}
-
-	// 表紙のHTMLかどうか
-	// 表紙のHTMLは目次で区切らない
-	isCoverPage := strings.Contains(innerText(node), "【表紙】")
 
 	var sb strings.Builder
 
@@ -271,32 +277,38 @@ func htmlToText(r io.Reader, audit bool) error {
 				}
 			} else if n.Type == html.ElementNode {
 				if n.Data == "ix:header" {
+					// InlineXBRLのheaderタグ以下は非表示項目なのでスキップする
 					return
 				}
 				if n.Data == "head" {
+					// headタグ以下は非表示項目なのでスキップする
 					return
 				}
 
 				if isHeading(n) && !isCoverPage {
+					// 【目次】処理。表紙の場合は目次で区切らない。
+					// 目次の直前までのテキストを前の目次のテキストにセット
 					headings[len(headings)-1].text = headings[len(headings)-1].text + " " + sb.String()
-					sb = strings.Builder{}
 
+					// 新しい目次の処理
+					sb = strings.Builder{}
 					for child := n.FirstChild; child != nil; child = child.NextSibling {
 						traverse(child)
 					}
-					headings = append(headings, Heading{title: sb.String()})
+					title := sb.String()
+					headings = append(headings, Heading{title: title, text: title})
 					sb = strings.Builder{}
-				}
-
-				spacing := reSpacedTags.MatchString(n.Data)
-				if spacing {
-					sb.WriteString(" ")
-				}
-				for child := n.FirstChild; child != nil; child = child.NextSibling {
-					traverse(child)
-				}
-				if spacing {
-					sb.WriteString(" ")
+				} else {
+					spacing := reSpacedTags.MatchString(n.Data)
+					if spacing {
+						sb.WriteString(" ")
+					}
+					for child := n.FirstChild; child != nil; child = child.NextSibling {
+						traverse(child)
+					}
+					if spacing {
+						sb.WriteString(" ")
+					}
 				}
 			} else if n.Type == html.TextNode {
 				// 日本語文字の間のスペースを除去する
@@ -310,7 +322,7 @@ func htmlToText(r io.Reader, audit bool) error {
 			}
 		}
 
-	traverse(node)
+	traverse(documentNode)
 	headings[len(headings)-1].text = headings[len(headings)-1].text + " " + sb.String()
 
 	return nil

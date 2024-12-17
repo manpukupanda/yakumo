@@ -9,6 +9,14 @@ import (
 	"os"
 )
 
+// EDINET APIの利用にはAPIキーを取得する必要があります。
+// EDINET操作ガイド(下のURL) >  EDINET API利用規約 に記載の方法にてAPIキーを取得できます。
+//
+//	https://disclosure2dl.edinet-fsa.go.jp/guide/static/disclosure/WZEK0110.html
+//
+// EDINET API のキー：環境変数 YAKUMO_EDINET_API_KEY より取得
+var apiKey string = os.Getenv("YAKUMO_EDINET_API_KEY")
+
 // APIキー未設定エラー
 var ErrApikey error = errors.New("ApiKey is empty")
 
