@@ -28,70 +28,6 @@ func urlOfDocuments(date string) string {
 	return fmt.Sprintf(apiDocumentsUrlFormat, date, apiKey)
 }
 
-// 書類一覧取得
-func GetDocuments(date string) (*Documents, error) {
-	if apiKey == "" {
-		return nil, ErrApikey
-	}
-	url := urlOfDocuments(date)
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	byteArray, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	data := new(Documents)
-	if err := json.Unmarshal(byteArray, data); err != nil {
-		return nil, err
-	}
-
-	return data, nil
-}
-
-// 本文ZIP取得APIのURLの書式
-var apiDownloadZipUrlFormat string = "https://api.edinet-fsa.go.jp/api/v2/documents/%s?type=1&Subscription-Key=%s"
-
-// 本文ZIP取得APIのURL
-func urlOfTheZip(docID string) string {
-	return fmt.Sprintf(apiDownloadZipUrlFormat, docID, apiKey)
-}
-
-// 本文ZIPを取得する
-func DownloadZip(docID string, filepath string) error {
-	if apiKey == "" {
-		return ErrApikey
-	}
-
-	url := urlOfTheZip(docID)
-
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	// Get the data
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Writer the body to file
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // 書類一覧JSONの構造体
 type Documents struct {
 	Metadata `json:"metadata"`
@@ -142,4 +78,68 @@ type Result struct {
 	EnglishDocFlag       string `json:"englishDocFlag"`
 	CsvFlag              string `json:"csvFlag"`
 	LegalStatus          string `json:"legalStatus"`
+}
+
+// 書類一覧取得
+func GetDocuments(date string) (*Documents, error) {
+	if apiKey == "" {
+		return nil, ErrApikey
+	}
+	url := urlOfDocuments(date)
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	byteArray, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	data := new(Documents)
+	if err := json.Unmarshal(byteArray, data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+// 書類取得APIのURLの書式
+var apiDownloadZipUrlFormat string = "https://api.edinet-fsa.go.jp/api/v2/documents/%s?type=1&Subscription-Key=%s"
+
+// 書類取得APIのURL
+func urlOfTheZip(docID string) string {
+	return fmt.Sprintf(apiDownloadZipUrlFormat, docID, apiKey)
+}
+
+// 本文ZIPを取得する
+func DownloadZip(docID string, filepath string) error {
+	if apiKey == "" {
+		return ErrApikey
+	}
+
+	url := urlOfTheZip(docID)
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Writer the body to file
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

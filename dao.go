@@ -161,6 +161,7 @@ func save(date string, result Result) error {
 			// 変更なし、なにもしない
 		} else {
 			// 変更あり、アップデート
+			log.Print("UPDATE documents")
 			rows, err = tx.Query(`
 			UPDATE documents
 			SET submitDateTime = $1,
@@ -231,7 +232,7 @@ func save(date string, result Result) error {
 		}
 
 		for _, s := range headings {
-			_, err = stmt2.Exec(result.DocID, seq, s.title, s.breadcrumb, s.text)
+			_, err = stmt2.Exec(result.DocID, seq, s.title, s.breadcrumb, s.content)
 			if err != nil {
 				tx.Rollback()
 				return err

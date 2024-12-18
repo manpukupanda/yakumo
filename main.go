@@ -135,7 +135,7 @@ func zipToText(zipfile string) error {
 type Heading struct {
 	title      string
 	breadcrumb string
-	text       string
+	content    string
 }
 
 // 目次スライス
@@ -183,9 +183,9 @@ func htmlsToText(dirpath string) error {
 	// 目次ごとのテキストから余分なスペースを除外する
 	for i := range headings {
 		// 空白文字、全角スペース、ノーブレークスペースが１つ以上連続する箇所半角スペース１つに置き換える。
-		t := rep.ReplaceAllString(headings[i].text, " ")
+		t := rep.ReplaceAllString(headings[i].content, " ")
 		// 前後の半角スペースは削除
-		headings[i].text = strings.Trim(t, " ")
+		headings[i].content = strings.Trim(t, " ")
 	}
 
 	// パンくず設定
@@ -288,7 +288,7 @@ func htmlToText(r io.Reader, firstHtmlOfAuditDoc bool) error {
 				if isHeading(n) && !isCoverPage {
 					// 【目次】処理。表紙の場合は目次で区切らない。
 					// 目次の直前までのテキストを前の目次のテキストにセット
-					headings[len(headings)-1].text = headings[len(headings)-1].text + " " + sb.String()
+					headings[len(headings)-1].content = headings[len(headings)-1].content + " " + sb.String()
 
 					// 新しい目次の処理
 					sb = strings.Builder{}
@@ -296,7 +296,7 @@ func htmlToText(r io.Reader, firstHtmlOfAuditDoc bool) error {
 						traverse(child)
 					}
 					title := sb.String()
-					headings = append(headings, Heading{title: title, text: title})
+					headings = append(headings, Heading{title: title, content: title})
 					sb = strings.Builder{}
 				} else {
 					spacing := reSpacedTags.MatchString(n.Data)
@@ -323,7 +323,7 @@ func htmlToText(r io.Reader, firstHtmlOfAuditDoc bool) error {
 		}
 
 	traverse(documentNode)
-	headings[len(headings)-1].text = headings[len(headings)-1].text + " " + sb.String()
+	headings[len(headings)-1].content = headings[len(headings)-1].content + " " + sb.String()
 
 	return nil
 }
